@@ -136,19 +136,22 @@ export const CrmModal: React.FC<CrmModalProps> = ({
 
   const statuses: LeadStatus[] = ['Novo', 'Em Contato', 'Análise Enviada', 'Em Negociação', 'Contratado', 'Perdido'];
 
-  const filteredLeads = leads.filter(l => {
-    const matchesSearch = l.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      l.whatsapp.includes(searchTerm) ||
-      l.objective.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredLeads = (leads || []).filter(l => {
+    if (!l) return false;
+    const name = String(l.name || '').toLowerCase();
+    const phone = String(l.whatsapp || '');
+    const obj = String(l.objective || '').toLowerCase();
+    const search = String(searchTerm || '').toLowerCase();
     
+    const matchesSearch = !search || name.includes(search) || phone.includes(search) || obj.includes(search);
     const matchesStatus = selectedStatusFilter === 'todos' || l.status === selectedStatusFilter;
     return matchesSearch && matchesStatus;
   });
 
   const handleOpenWhatsApp = (lead: Lead) => {
-    const cleanPhone = lead.whatsapp.replace(/\D/g, '');
+    const cleanPhone = String(lead?.whatsapp || '').replace(/\D/g, '');
     const message = encodeURIComponent(
-      `Olá, ${lead.name}! Sou consultor da 3P Patrimônio. Recebi sua solicitação referente ao objetivo: "${lead.objective}".\nPodemos conversar sobre a análise do crédito de ${lead.creditAmount}?`
+      `Olá, ${lead?.name || 'Cliente'}! Sou consultor da 3P Patrimônio. Recebi sua solicitação referente ao objetivo: "${lead?.objective || 'Planejamento Patrimonial'}".\nPodemos conversar sobre a análise do crédito de ${lead?.creditAmount || ''}?`
     );
     window.open(`https://wa.me/55${cleanPhone}?text=${message}`, '_blank');
   };
@@ -247,7 +250,7 @@ export const CrmModal: React.FC<CrmModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-2 sm:p-4">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-2 sm:p-4 animate-fadeIn">
       <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-6xl h-[92vh] flex flex-col shadow-2xl overflow-hidden relative">
         
         {/* Header Bar */}

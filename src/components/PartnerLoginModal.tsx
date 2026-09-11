@@ -86,19 +86,17 @@ export const PartnerLoginModal: React.FC<PartnerLoginModalProps> = ({
       }
     }
 
-    setTimeout(() => {
-      setLoading(false);
+    setLoading(false);
 
-      if (authorized) {
-        setSuccessMsg('Acesso autorizado! Carregando painel...');
-        setTimeout(() => {
-          onLoginSuccess(authUser.name, authUser.email);
-          onClose();
-        }, 500);
-      } else {
-        setErrorMsg('E-mail ou senha incorretos.');
-      }
-    }, 400);
+    if (authorized) {
+      setSuccessMsg('Acesso autorizado! Abrindo painel...');
+      setTimeout(() => {
+        onLoginSuccess(authUser.name, authUser.email);
+        onClose();
+      }, 100);
+    } else {
+      setErrorMsg('E-mail ou senha incorretos.');
+    }
   };
 
   return (

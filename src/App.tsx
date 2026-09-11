@@ -86,6 +86,7 @@ export default function App() {
     try {
       localStorage.setItem('3p_partner_session', JSON.stringify(session));
     } catch (e) {}
+    setLoginModalOpen(false);
     setCrmOpen(true);
   };
 
@@ -295,8 +296,20 @@ export default function App() {
       const params = new URLSearchParams(window.location.search);
       if (hash.includes('socio') || hash.includes('login') || hash.includes('crm') || params.get('socios') || params.get('login') || params.get('crm')) {
         setTimeout(() => {
-          setLoginModalOpen(true);
-        }, 200);
+          let hasSession = false;
+          try {
+            const saved = localStorage.getItem('3p_partner_session');
+            if (saved && JSON.parse(saved)?.loggedIn) {
+              hasSession = true;
+            }
+          } catch {}
+
+          if (hasSession) {
+            setCrmOpen(true);
+          } else {
+            setLoginModalOpen(true);
+          }
+        }, 150);
       } else if (window.location.hash) {
         handleNavigate(window.location.hash);
       }
@@ -355,6 +368,39 @@ export default function App() {
       {/* Floating Accessibility Widget */}
       <AccessibilityToolbar />
 
+      {/* Barra Superior de Sócio Conectado com Acesso Direto ao CRM */}
+      {partnerUser?.loggedIn && (
+        <div className="bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 font-bold px-3 py-2 text-xs shadow-lg sticky top-0 z-50">
+          <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 truncate">
+              <span className="bg-slate-950 text-amber-400 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider">
+                Área do Sócio
+              </span>
+              <span className="truncate hidden sm:inline">Conectado: <strong>{partnerUser.name}</strong></span>
+              <span className="text-[11px] bg-slate-950/20 px-2 py-0.5 rounded-full font-mono font-black">
+                {leads.length} {leads.length === 1 ? 'Lead' : 'Leads'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => setCrmOpen(true)}
+                className="bg-slate-950 hover:bg-slate-900 text-amber-400 hover:text-white px-3 py-1 rounded-lg text-xs font-extrabold flex items-center gap-1.5 shadow transition-all active:scale-95"
+              >
+                <LayoutDashboard className="w-3.5 h-3.5" />
+                <span>Abrir Painel CRM</span>
+              </button>
+              <button
+                onClick={handleLogoutPartner}
+                className="bg-slate-950/15 hover:bg-slate-950/30 text-slate-950 px-2 py-1 rounded-lg text-[11px] font-bold transition-colors"
+                title="Sair da sessão"
+              >
+                Sair
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header Landmark */}
       <Header
         onOpenForm={handleScrollToForm}
@@ -363,6 +409,11 @@ export default function App() {
         onNavigate={handleNavigate}
         revealedSections={revealedSections}
         showAllSections={showAllSections}
+        partnerUser={partnerUser}
+        onOpenCRM={() => setCrmOpen(true)}
+        onOpenPartnerLogin={() => setLoginModalOpen(true)}
+        onLogoutPartner={handleLogoutPartner}
+        leadCount={leads.length}
       />
 
       {/* Main Content Landmark */}

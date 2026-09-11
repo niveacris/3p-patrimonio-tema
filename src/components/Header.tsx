@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PhoneCall, Menu, X, Sun, Moon } from 'lucide-react';
+import { PhoneCall, Menu, X, Sun, Moon, LayoutDashboard, Lock, UserCheck, LogOut } from 'lucide-react';
 import { BrandLogo } from './BrandLogo';
 import { useTheme } from '../utils/theme';
 
@@ -16,6 +16,11 @@ interface HeaderProps {
     faq: boolean;
   };
   showAllSections?: boolean;
+  partnerUser?: { loggedIn: boolean; name: string; email: string } | null;
+  onOpenCRM?: () => void;
+  onOpenPartnerLogin?: () => void;
+  onLogoutPartner?: () => void;
+  leadCount?: number;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -23,6 +28,11 @@ export const Header: React.FC<HeaderProps> = ({
   onNavigate,
   revealedSections,
   showAllSections,
+  partnerUser,
+  onOpenCRM,
+  onOpenPartnerLogin,
+  onLogoutPartner,
+  leadCount,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
@@ -99,7 +109,45 @@ export const Header: React.FC<HeaderProps> = ({
           </nav>
 
           {/* Right Action Buttons */}
-          <div className="hidden sm:flex items-center gap-3">
+          <div className="hidden sm:flex items-center gap-2.5">
+
+            {/* Painel CRM para Sócio Conectado */}
+            {partnerUser?.loggedIn ? (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={onOpenCRM}
+                  className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs px-3.5 py-2.5 rounded-xl shadow-lg shadow-amber-500/20 transition-all flex items-center gap-1.5 active:scale-95 border border-amber-400"
+                  title="Abrir Painel CRM dos Sócios"
+                >
+                  <LayoutDashboard className="w-4 h-4 text-slate-950" />
+                  <span>Painel CRM</span>
+                  {typeof leadCount === 'number' && (
+                    <span className="bg-slate-950 text-amber-400 text-[10px] font-mono font-black px-1.5 py-0.5 rounded-full">
+                      {leadCount}
+                    </span>
+                  )}
+                </button>
+
+                {onLogoutPartner && (
+                  <button
+                    onClick={onLogoutPartner}
+                    className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-800/80 rounded-xl transition-colors text-xs"
+                    title="Sair da sessão do Sócio"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            ) : (
+              <button
+                onClick={onOpenPartnerLogin}
+                className="hidden xl:flex items-center gap-1.5 text-xs text-slate-400 hover:text-amber-400 font-semibold px-2.5 py-2 rounded-xl hover:bg-slate-800/60 transition-colors"
+                title="Acesso dos Sócios"
+              >
+                <Lock className="w-3.5 h-3.5" />
+                <span>Área dos Sócios</span>
+              </button>
+            )}
             
             {/* Theme Toggle (Claro / Escuro) */}
             <button
@@ -115,7 +163,7 @@ export const Header: React.FC<HeaderProps> = ({
             {/* Main CTA */}
             <button
               onClick={onOpenForm}
-              className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs uppercase tracking-wider px-5 py-3 rounded-xl shadow-lg shadow-amber-500/20 transition-all flex items-center gap-2 transform active:scale-95"
+              className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs uppercase tracking-wider px-4 sm:px-5 py-3 rounded-xl shadow-lg shadow-amber-500/20 transition-all flex items-center gap-2 transform active:scale-95"
             >
               <PhoneCall className="w-4 h-4" />
               <span>Fale com Consultor</span>
@@ -124,6 +172,19 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Mobile menu trigger button */}
           <div className="flex lg:hidden items-center gap-2">
+            {partnerUser?.loggedIn && (
+              <button
+                onClick={onOpenCRM}
+                className="p-2 bg-amber-500 text-slate-950 rounded-xl font-bold flex items-center gap-1 text-xs"
+                title="Abrir CRM"
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                {typeof leadCount === 'number' && (
+                  <span className="text-[10px] font-mono">{leadCount}</span>
+                )}
+              </button>
+            )}
+
             <button
               onClick={toggleTheme}
               className="p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-amber-400"
@@ -176,6 +237,51 @@ export const Header: React.FC<HeaderProps> = ({
               );
             })}
           </nav>
+
+          {/* Seção dos Sócios no Mobile Menu */}
+          {partnerUser?.loggedIn ? (
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-amber-400 font-bold flex items-center gap-1.5">
+                  <UserCheck className="w-4 h-4" />
+                  <span className="truncate">{partnerUser.name}</span>
+                </span>
+                {onLogoutPartner && (
+                  <button
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      onLogoutPartner();
+                    }}
+                    className="text-[11px] text-slate-400 hover:text-red-400 flex items-center gap-1"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Sair</span>
+                  </button>
+                )}
+              </div>
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  onOpenCRM?.();
+                }}
+                className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs py-2.5 rounded-lg flex items-center justify-center gap-2 shadow-md"
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                <span>Acessar Painel CRM ({leadCount ?? 0})</span>
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                onOpenPartnerLogin?.();
+              }}
+              className="w-full py-2.5 px-3 rounded-xl border border-slate-800 bg-slate-950 text-slate-400 hover:text-amber-400 text-xs font-semibold flex items-center justify-center gap-2"
+            >
+              <Lock className="w-3.5 h-3.5" />
+              <span>Acesso dos Sócios / CRM</span>
+            </button>
+          )}
 
           <div className="pt-2 flex flex-col gap-2">
             <button
