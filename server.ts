@@ -481,14 +481,19 @@ app.post("/api/auth/login", (req, res) => {
   const { email, password } = req.body || {};
   const cleanedEmail = String(email || '').trim().toLowerCase();
   
-  const validEmails = ['socios@3ppatrimonio.com.br', 'contato@3ppatrimonio.com.br'];
-  const isValidPass = password === '3P@socios' || password === '3p@socios';
+  const isSocios = cleanedEmail === 'socios@3ppatrimonio.com.br';
+  const isContato = cleanedEmail === 'contato@3ppatrimonio.com.br';
 
-  if (validEmails.includes(cleanedEmail) && isValidPass) {
+  const isValidSociosPass = password === '3P@socios' || password === '3p@socios';
+  const isValidContatoPass = password === '3P@socios' || password === '3p@socios' || password === '3p@2026';
+
+  const isAuthorized = (isSocios && isValidSociosPass) || (isContato && isValidContatoPass);
+
+  if (isAuthorized) {
     return res.json({
       success: true,
       user: {
-        name: cleanedEmail === 'contato@3ppatrimonio.com.br' ? 'Contato 3P Patrimônio' : 'Sócio 3P Patrimônio',
+        name: isContato ? 'Contato 3P Patrimônio' : 'Sócio 3P Patrimônio',
         email: cleanedEmail,
         role: 'partner'
       }

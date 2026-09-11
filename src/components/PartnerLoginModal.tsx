@@ -28,17 +28,23 @@ export const PartnerLoginModal: React.FC<PartnerLoginModalProps> = ({
     setErrorMsg('');
     setSuccessMsg('');
 
-    const validEmails = ['socios@3ppatrimonio.com.br', 'contato@3ppatrimonio.com.br'];
-    const isValidPass = password === '3P@socios' || password === '3p@socios';
+    const inputEmail = email.trim().toLowerCase();
+    const isSocios = inputEmail === 'socios@3ppatrimonio.com.br';
+    const isContato = inputEmail === 'contato@3ppatrimonio.com.br';
+
+    const isValidSociosPass = password === '3P@socios' || password === '3p@socios';
+    const isValidContatoPass = password === '3P@socios' || password === '3p@socios' || password === '3p@2026';
+
+    const isAuthorized = (isSocios && isValidSociosPass) || (isContato && isValidContatoPass);
 
     setTimeout(() => {
       setLoading(false);
-      const inputEmail = email.trim().toLowerCase();
 
-      if (validEmails.includes(inputEmail) && isValidPass) {
-        setSuccessMsg('Acesso autorizado! Carregando painel dos sócios...');
+      if (isAuthorized) {
+        setSuccessMsg('Acesso autorizado! Carregando painel...');
+        const userName = isContato ? 'Contato 3P Patrimônio' : 'Sócio 3P Patrimônio';
         setTimeout(() => {
-          onLoginSuccess('Sócio 3P Patrimônio', inputEmail);
+          onLoginSuccess(userName, inputEmail);
           onClose();
         }, 600);
       } else {
@@ -104,7 +110,7 @@ export const PartnerLoginModal: React.FC<PartnerLoginModalProps> = ({
               <input
                 type="email"
                 required
-                placeholder="socios@3ppatrimonio.com.br"
+                placeholder="socios@3ppatrimonio.com.br ou contato@..."
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-600 outline-none transition-colors"
