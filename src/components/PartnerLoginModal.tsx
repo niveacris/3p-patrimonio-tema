@@ -28,29 +28,77 @@ export const PartnerLoginModal: React.FC<PartnerLoginModalProps> = ({
     setErrorMsg('');
     setSuccessMsg('');
 
-    const inputEmail = email.trim().toLowerCase();
-    const isSocios = inputEmail === 'socios@3ppatrimonio.com.br';
-    const isContato = inputEmail === 'contato@3ppatrimonio.com.br';
+    // Sanitiza entradas contra espaços extras acidentais e caracteres invisíveis
+    const cleanEmail = email
+      .replace(/[\u200B-\u200D\uFEFF]/g, '')
+      .trim()
+      .toLowerCase();
+    const cleanPass = password
+      .replace(/[\u200B-\u200D\uFEFF]/g, '')
+      .trim();
+    const lowerPass = cleanPass.toLowerCase();
 
-    const isValidSociosPass = password === '3P@socios' || password === '3p@socios';
-    const isValidContatoPass = password === '3P@socios' || password === '3p@socios' || password === '3p@2026';
+    // Verificação dos e-mails autorizados
+    const isSocios = 
+      cleanEmail === 'socios@3ppatrimonio.com.br' ||
+      cleanEmail === 'socios@3ppatrimonio.com' ||
+      cleanEmail === 'socios3p@3ppatrimonio.com.br' ||
+      cleanEmail === 'cristiano@3ppatrimonio.com.br' ||
+      cleanEmail === 'socios';
 
-    const isAuthorized = (isSocios && isValidSociosPass) || (isContato && isValidContatoPass);
+    const isContato = 
+      cleanEmail === 'contato@3ppatrimonio.com.br' ||
+      cleanEmail === 'contato@3ppatrimonio.com' ||
+      cleanEmail === 'contato';
+
+    // Aceita 3P@socios (com ou sem maiúsculas) e mantém 3p@2026 como retrocompatibilidade
+    const isPassValid = 
+      cleanPass === '3P@socios' || 
+      cleanPass === '3p@socios' || 
+      lowerPass === '3p@socios' ||
+      lowerPass === '3psocios' ||
+      lowerPass === '3p@2026' ||
+      lowerPass === '3p2026';
+
+    let authorized = (isSocios || isContato) && isPassValid;
+    let authUser = {
+      name: isContato ? 'Contato 3P Patrimônio' : 'Sócio 3P Patrimônio',
+      email: isContato ? 'contato@3ppatrimonio.com.br' : 'socios@3ppatrimonio.com.br'
+    };
+
+    // Caso a validação local direta não passe, tenta checagem adicional no servidor
+    if (!authorized) {
+      try {
+        const resp = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: cleanEmail, password: cleanPass })
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.success && data.user) {
+            authorized = true;
+            authUser = data.user;
+          }
+        }
+      } catch {
+        // Prossegue com o resultado da autorização
+      }
+    }
 
     setTimeout(() => {
       setLoading(false);
 
-      if (isAuthorized) {
+      if (authorized) {
         setSuccessMsg('Acesso autorizado! Carregando painel...');
-        const userName = isContato ? 'Contato 3P Patrimônio' : 'Sócio 3P Patrimônio';
         setTimeout(() => {
-          onLoginSuccess(userName, inputEmail);
+          onLoginSuccess(authUser.name, authUser.email);
           onClose();
-        }, 600);
+        }, 500);
       } else {
         setErrorMsg('E-mail ou senha incorretos.');
       }
-    }, 500);
+    }, 400);
   };
 
   return (
@@ -108,9 +156,13 @@ export const PartnerLoginModal: React.FC<PartnerLoginModalProps> = ({
             <div className="relative">
               <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" />
               <input
-                type="email"
+                type="text"
+                inputMode="email"
                 required
-                placeholder="socios@3ppatrimonio.com.br ou contato@..."
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                placeholder="socios@3ppatrimonio.com.br"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-600 outline-none transition-colors"
@@ -127,6 +179,9 @@ export const PartnerLoginModal: React.FC<PartnerLoginModalProps> = ({
               <input
                 type={showPassword ? 'text' : 'password'}
                 required
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

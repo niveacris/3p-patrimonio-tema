@@ -479,22 +479,43 @@ app.post("/api/settings/webhook", (req, res) => {
 // Partner Authentication Endpoint (Acesso Restrito dos Sócios)
 app.post("/api/auth/login", (req, res) => {
   const { email, password } = req.body || {};
-  const cleanedEmail = String(email || '').trim().toLowerCase();
+  const cleanEmail = String(email || '')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .trim()
+    .toLowerCase();
+  const cleanPass = String(password || '')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .trim();
+  const lowerPass = cleanPass.toLowerCase();
   
-  const isSocios = cleanedEmail === 'socios@3ppatrimonio.com.br';
-  const isContato = cleanedEmail === 'contato@3ppatrimonio.com.br';
+  const isSocios = 
+    cleanEmail === 'socios@3ppatrimonio.com.br' ||
+    cleanEmail === 'socios@3ppatrimonio.com' ||
+    cleanEmail === 'socios3p@3ppatrimonio.com.br' ||
+    cleanEmail === 'cristiano@3ppatrimonio.com.br' ||
+    cleanEmail === 'socios';
 
-  const isValidSociosPass = password === '3P@socios' || password === '3p@socios';
-  const isValidContatoPass = password === '3P@socios' || password === '3p@socios' || password === '3p@2026';
+  const isContato = 
+    cleanEmail === 'contato@3ppatrimonio.com.br' ||
+    cleanEmail === 'contato@3ppatrimonio.com' ||
+    cleanEmail === 'contato';
 
-  const isAuthorized = (isSocios && isValidSociosPass) || (isContato && isValidContatoPass);
+  const isPassValid = 
+    cleanPass === '3P@socios' || 
+    cleanPass === '3p@socios' || 
+    lowerPass === '3p@socios' ||
+    lowerPass === '3psocios' ||
+    lowerPass === '3p@2026' ||
+    lowerPass === '3p2026';
 
-  if (isAuthorized) {
+  if ((isSocios || isContato) && isPassValid) {
+    const emailToUse = isContato ? 'contato@3ppatrimonio.com.br' : 'socios@3ppatrimonio.com.br';
+    const nameToUse = isContato ? 'Contato 3P Patrimônio' : 'Sócio 3P Patrimônio';
     return res.json({
       success: true,
       user: {
-        name: isContato ? 'Contato 3P Patrimônio' : 'Sócio 3P Patrimônio',
-        email: cleanedEmail,
+        name: nameToUse,
+        email: emailToUse,
         role: 'partner'
       }
     });

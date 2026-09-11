@@ -257,7 +257,16 @@ export default function App() {
 
   // Progressive navigation handler: reveals section on demand and smoothly scrolls
   const handleNavigate = (href: string) => {
-    const targetId = href.replace('#', '');
+    const targetId = href.replace('#', '').toLowerCase();
+
+    if (targetId === 'socios' || targetId === 'login' || targetId === 'crm' || targetId === 'admin') {
+      if (partnerUser?.loggedIn) {
+        setCrmOpen(true);
+      } else {
+        setLoginModalOpen(true);
+      }
+      return;
+    }
 
     if (targetId === 'como-funciona') {
       setRevealedSections((prev) => ({ ...prev, process: true }));
@@ -279,10 +288,18 @@ export default function App() {
     }, 80);
   };
 
-  // Handle URL hash on initial page load if direct link was used
+  // Handle URL hash and query params on initial page load if direct link was used
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.location.hash) {
-      handleNavigate(window.location.hash);
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash?.toLowerCase();
+      const params = new URLSearchParams(window.location.search);
+      if (hash.includes('socio') || hash.includes('login') || hash.includes('crm') || params.get('socios') || params.get('login') || params.get('crm')) {
+        setTimeout(() => {
+          setLoginModalOpen(true);
+        }, 200);
+      } else if (window.location.hash) {
+        handleNavigate(window.location.hash);
+      }
     }
   }, []);
 
