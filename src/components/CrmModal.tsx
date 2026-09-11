@@ -57,6 +57,11 @@ export const CrmModal: React.FC<CrmModalProps> = ({
   const [simulatingIg, setSimulatingIg] = useState(false);
   const [igSimFeedback, setIgSimFeedback] = useState('');
 
+  // Excel Export states (Declared at the top with all other hooks to satisfy React Rules of Hooks)
+  const [isExportingExcel, setIsExportingExcel] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'xls' | 'xlsx' | null>(null);
+  const [exportFeedback, setExportFeedback] = useState<string | null>(null);
+
   const handleCopy = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     setCopiedText(label);
@@ -163,10 +168,6 @@ export const CrmModal: React.FC<CrmModalProps> = ({
       setEditingNotesId(null);
     }
   };
-
-  const [isExportingExcel, setIsExportingExcel] = useState(false);
-  const [exportFormat, setExportFormat] = useState<'xls' | 'xlsx' | null>(null);
-  const [exportFeedback, setExportFeedback] = useState<string | null>(null);
 
   const handleExport = (format: 'xls' | 'xlsx' = 'xls') => {
     try {
