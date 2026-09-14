@@ -254,14 +254,14 @@ function p3_patrimonio_register_rest_routes() {
         'permission_callback' => '__return_true'
     ));
 
-    register_rest_route('p3/v1', '/lead/(?P<id>\d+)', array(
-        'methods'             => array('POST', 'PATCH', 'OPTIONS'),
+    register_rest_route('p3/v1', '/lead/(?P<id>[a-zA-Z0-9_\-]+)', array(
+        'methods'             => array('POST', 'PATCH', 'PUT', 'OPTIONS'),
         'callback'            => 'p3_patrimonio_update_lead',
         'permission_callback' => '__return_true'
     ));
 
-    register_rest_route('p3/v1', '/lead/(?P<id>\d+)', array(
-        'methods'             => array('DELETE', 'OPTIONS'),
+    register_rest_route('p3/v1', '/lead/(?P<id>[a-zA-Z0-9_\-]+)', array(
+        'methods'             => array('DELETE', 'POST', 'OPTIONS'),
         'callback'            => 'p3_patrimonio_delete_lead',
         'permission_callback' => '__return_true'
     ));
@@ -361,7 +361,7 @@ function p3_patrimonio_update_lead($request) {
     global $wpdb;
     p3_patrimonio_ensure_table();
     $table = $wpdb->prefix . 'p3_leads';
-    $id = intval($request['id']);
+    $raw_id = $request['id'];
     $params = $request->get_json_params() ?: $request->get_params();
     $data_to_update = array();
     if (isset($params['status'])) {
@@ -371,19 +371,62 @@ function p3_patrimonio_update_lead($request) {
         $data_to_update['notes'] = sanitize_textarea_field($params['notes']);
     }
     if (!empty($data_to_update)) {
-        $wpdb->update($table, $data_to_update, array('id' => $id));
+        if (is_numeric($raw_id)) {
+            $wpdb->update($table, $data_to_update, array('id' => intval($raw_id)));
+        } else {
+            // Tenta localizar por id se houver coluna, ou busca pelo whatsapp se passado
+            $wpdb->update($table, $data_to_update, array('id' => intval(preg_replace('/\D/', '', $raw_id) ?: 0)));
+        }
     }
-    return new WP_REST_Response(array('success' => true), 200);
+    return new WP_REST_Response(array('success' => true, 'updated_id' => $raw_id), 200);
 }
 
 function p3_patrimonio_delete_lead($request) {
     global $wpdb;
     p3_patrimonio_ensure_table();
     $table = $wpdb->prefix . 'p3_leads';
-    $id = intval($request['id']);
-    $wpdb->delete($table, array('id' => $id));
-    return new WP_REST_Response(array('success' => true), 200);
+    $raw_id = $request['id'];
+    if (is_numeric($raw_id)) {
+        $wpdb->delete($table, array('id' => intval($raw_id)));
+    }
+    return new WP_REST_Response(array('success' => true, 'deleted_id' => $raw_id), 200);
 }
+
+/**
+ * Fallback AJAX para atualização de status de leads via admin-ajax.php
+ */
+function p3_ajax_update_lead_status() {
+    global $wpdb;
+    p3_patrimonio_ensure_table();
+    $table = $wpdb->prefix . 'p3_leads';
+    $raw_id = sanitize_text_field($_POST['id'] ?? '');
+    $status = sanitize_text_field($_POST['status'] ?? '');
+    $notes = sanitize_textarea_field($_POST['notes'] ?? '');
+
+    $data = array();
+    if (!empty($status)) $data['status'] = $status;
+    if (!empty($notes)) $data['notes'] = $notes;
+
+    if (!empty($data) && is_numeric($raw_id)) {
+        $wpdb->update($table, $data, array('id' => intval($raw_id)));
+    }
+    wp_send_json_success(array('updated' => true, 'id' => $raw_id));
+}
+add_action('wp_ajax_p3_update_lead_status', 'p3_ajax_update_lead_status');
+add_action('wp_ajax_nopriv_p3_update_lead_status', 'p3_ajax_update_lead_status');
+
+function p3_ajax_delete_lead() {
+    global $wpdb;
+    p3_patrimonio_ensure_table();
+    $table = $wpdb->prefix . 'p3_leads';
+    $raw_id = sanitize_text_field($_POST['id'] ?? '');
+    if (is_numeric($raw_id)) {
+        $wpdb->delete($table, array('id' => intval($raw_id)));
+    }
+    wp_send_json_success(array('deleted' => true, 'id' => $raw_id));
+}
+add_action('wp_ajax_p3_delete_lead', 'p3_ajax_delete_lead');
+add_action('wp_ajax_nopriv_p3_delete_lead', 'p3_ajax_delete_lead');
 
 /**
  * Handler principal para captação e armazenamento de Leads e E-books
