@@ -131,7 +131,7 @@ function p3_patrimonio_scripts() {
     }
 
     // 2. CSS Padrão do Tema (style.css)
-    wp_enqueue_style('p3-theme-style', get_stylesheet_uri(), array(), '1.0.1');
+    wp_enqueue_style('p3-theme-style', get_stylesheet_uri(), array(), '1.2.0');
 
     // 3. Script Principal da Aplicação React 18
     $js_rel = p3_get_theme_asset('js', 'index');
