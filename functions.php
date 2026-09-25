@@ -550,13 +550,27 @@ function p3_patrimonio_handle_lead($request) {
         ));
 
         if ($existing_lead) {
-            // Se for e-book, libera sem duplicar no banco de dados MySQL
+            // Se for e-book, registra no CRM a ação de download do e-book e atualiza histórico
             if ($is_ebook) {
+                $notes_update = (!empty($existing_lead->notes) ? $existing_lead->notes . ' | ' : '') . 'Download do e-book realizado em ' . current_time('d/m/Y H:i:s');
+                $update_fields = array(
+                    'source'     => 'E-book Gratuito (Carlos Yoshimori)',
+                    'notes'      => $notes_update,
+                    'active'     => 1,
+                    'deleted_at' => null
+                );
+                if (!empty($name)) $update_fields['name'] = $name;
+                if (!empty($whatsapp)) $update_fields['whatsapp'] = $whatsapp;
+
+                $wpdb->update($table, $update_fields, array('id' => $existing_lead->id));
+
                 return new WP_REST_Response(array(
-                    'success'           => true,
-                    'leadId'            => (string) $existing_lead->id,
-                    'alreadyRegistered' => true,
-                    'message'           => 'E-mail já cadastrado. Liberando download do e-book!'
+                    'success'             => true,
+                    'leadId'              => (string) $existing_lead->id,
+                    'alreadyRegistered'   => false,
+                    'assignedTo'          => $existing_lead->assigned_to,
+                    'assignedPartnerName' => $existing_lead->assigned_partner_name,
+                    'message'             => 'Download do e-book registrado no CRM com sucesso!'
                 ), 200);
             }
 
@@ -831,9 +845,17 @@ function p3_theme_handle_export_leads() {
         global $wpdb;
         $table_name = $wpdb->prefix . 'p3_leads';
         p3_patrimonio_ensure_table();
-        $leads = $wpdb->get_results("SELECT * FROM $table_name ORDER BY id DESC");
 
-        $filename = 'leads_3p_patrimonio_' . date('Y-m-d_His') . '.xls';
+        $scope = isset($_GET['scope']) ? sanitize_text_field($_GET['scope']) : (isset($_GET['filter']) ? sanitize_text_field($_GET['filter']) : 'all');
+        if ($scope === 'active') {
+            $leads = $wpdb->get_results("SELECT * FROM $table_name WHERE (active IS NULL OR active = 1) AND (deleted_at IS NULL) AND (status != 'Inativo') ORDER BY id DESC");
+            $filename = 'leads_3p_patrimonio_ativos_' . date('Y-m-d_His') . '.xls';
+            $sheet_title = 'Leads Ativos 3P';
+        } else {
+            $leads = $wpdb->get_results("SELECT * FROM $table_name ORDER BY id DESC");
+            $filename = 'leads_3p_patrimonio_todos_' . date('Y-m-d_His') . '.xls';
+            $sheet_title = 'Todos os Leads 3P';
+        }
 
         header('Content-Type: application/vnd.ms-excel; charset=utf-8');
         header('Content-Disposition: attachment; filename="' . $filename . '"');
@@ -843,7 +865,7 @@ function p3_theme_handle_export_leads() {
         echo '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">';
         echo '<head>';
         echo '<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />';
-        echo '<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Leads 3P Patrimônio</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->';
+        echo '<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>' . esc_html($sheet_title) . '</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->';
         echo '<style>';
         echo 'th { background-color: #020617; color: #fbbf24; font-weight: bold; border: 1px solid #334155; padding: 10px; font-family: Arial, sans-serif; font-size: 13px; }';
         echo 'td { border: 1px solid #cbd5e1; padding: 8px; font-family: Arial, sans-serif; font-size: 12px; }';
@@ -856,6 +878,8 @@ function p3_theme_handle_export_leads() {
         echo '<tr>';
         echo '<th>Nº / ID</th>';
         echo '<th>Data/Hora</th>';
+        echo '<th>Situação</th>';
+        echo '<th>Sócio Responsável</th>';
         echo '<th>Nome Completo</th>';
         echo '<th>WhatsApp / Telefone</th>';
         echo '<th>E-mail</th>';
@@ -877,9 +901,13 @@ function p3_theme_handle_export_leads() {
             foreach ($leads as $l) {
                 $idx++;
                 $cls = ($idx % 2 === 0) ? ' class="odd"' : '';
+                $situacao = ((isset($l->active) && intval($l->active) === 0) || (isset($l->status) && $l->status === 'Inativo')) ? 'Inativo' : 'Ativo';
+                $socio = !empty($l->assigned_partner_name) ? ($l->assigned_partner_name . (!empty($l->assigned_to) ? ' (' . $l->assigned_to . ')' : '')) : (!empty($l->assigned_to) ? $l->assigned_to : 'Distribuído 3P');
                 echo '<tr' . $cls . '>';
                 echo '<td>' . esc_html($l->id) . '</td>';
                 echo '<td>' . esc_html(date('d/m/Y H:i', strtotime($l->created_at))) . '</td>';
+                echo '<td><strong>' . esc_html($situacao) . '</strong></td>';
+                echo '<td>' . esc_html($socio) . '</td>';
                 echo '<td><strong>' . esc_html($l->name) . '</strong></td>';
                 echo '<td>' . esc_html($l->whatsapp) . '</td>';
                 echo '<td>' . esc_html($l->email ?? '') . '</td>';
@@ -910,23 +938,35 @@ function p3_theme_handle_export_leads() {
         global $wpdb;
         $table_name = $wpdb->prefix . 'p3_leads';
         p3_patrimonio_ensure_table();
-        $leads = $wpdb->get_results("SELECT * FROM $table_name ORDER BY id DESC");
+
+        $scope = isset($_GET['scope']) ? sanitize_text_field($_GET['scope']) : (isset($_GET['filter']) ? sanitize_text_field($_GET['filter']) : 'all');
+        if ($scope === 'active') {
+            $leads = $wpdb->get_results("SELECT * FROM $table_name WHERE (active IS NULL OR active = 1) AND (deleted_at IS NULL) AND (status != 'Inativo') ORDER BY id DESC");
+            $csv_filename = 'leads_3p_patrimonio_ativos_' . date('Y-m-d_His') . '.csv';
+        } else {
+            $leads = $wpdb->get_results("SELECT * FROM $table_name ORDER BY id DESC");
+            $csv_filename = 'leads_3p_patrimonio_todos_' . date('Y-m-d_His') . '.csv';
+        }
 
         header('Content-Type: text/csv; charset=utf-8');
-        header('Content-Disposition: attachment; filename=3p_patrimonio_leads_' . date('Y-m-d_His') . '.csv');
+        header('Content-Disposition: attachment; filename="' . $csv_filename . '"');
         header('Pragma: no-cache');
         header('Expires: 0');
 
         $output = fopen('php://output', 'w');
         // UTF-8 BOM para abrir com acentuação correta no Microsoft Excel
         fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
-        fputcsv($output, array('ID', 'Data/Hora', 'Nome', 'WhatsApp', 'E-mail', 'Origem', 'Objetivo', 'Crédito', 'Parcela', 'Prazo', 'Recursos Lance', 'Status', 'Mensagem', 'Notas'));
+        fputcsv($output, array('ID', 'Data/Hora', 'Situação', 'Sócio Responsável', 'Nome', 'WhatsApp', 'E-mail', 'Origem', 'Objetivo', 'Crédito', 'Parcela', 'Prazo', 'Recursos Lance', 'Status', 'Mensagem', 'Notas'));
 
         if (!empty($leads)) {
             foreach ($leads as $l) {
+                $situacao = ((isset($l->active) && intval($l->active) === 0) || (isset($l->status) && $l->status === 'Inativo')) ? 'Inativo' : 'Ativo';
+                $socio = !empty($l->assigned_partner_name) ? ($l->assigned_partner_name . (!empty($l->assigned_to) ? ' (' . $l->assigned_to . ')' : '')) : (!empty($l->assigned_to) ? $l->assigned_to : 'Distribuído 3P');
                 fputcsv($output, array(
                     $l->id,
                     $l->created_at,
+                    $situacao,
+                    $socio,
                     $l->name,
                     $l->whatsapp,
                     $l->email ?? '',
@@ -1044,8 +1084,9 @@ if (!function_exists('p3_register_admin_menu')) {
         echo '<p style="color: #94a3b8; margin: 0; font-size: 13px;">Hospedado na Hostinger • Banco de Dados MySQL • Notificações via E-mail Ativas</p>';
         echo '</div>';
         echo '<div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">';
-        echo '<a href="' . admin_url('admin.php?page=p3-leads-manager&action=export_xls') . '" style="background: #10b981; color: #020617; font-weight: 800; padding: 12px 20px; border-radius: 10px; text-decoration: none; font-size: 13px; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);">📊 Exportar Planilha (.XLS)</a>';
-        echo '<a href="' . admin_url('admin.php?page=p3-leads-manager&action=export_csv') . '" style="background: #1e293b; color: #e2e8f0; font-weight: 700; padding: 12px 16px; border-radius: 10px; text-decoration: none; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid #334155;">📥 Exportar CSV</a>';
+        echo '<a href="' . admin_url('admin.php?page=p3-leads-manager&action=export_xls&scope=active') . '" style="background: #10b981; color: #020617; font-weight: 800; padding: 12px 18px; border-radius: 10px; text-decoration: none; font-size: 13px; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);">📊 Exportar Excel (Só Ativos)</a>';
+        echo '<a href="' . admin_url('admin.php?page=p3-leads-manager&action=export_xls&scope=all') . '" style="background: #047857; color: #ffffff; font-weight: 800; padding: 12px 18px; border-radius: 10px; text-decoration: none; font-size: 13px; display: inline-flex; align-items: center; gap: 8px;">📁 Exportar Excel (Todos)</a>';
+        echo '<a href="' . admin_url('admin.php?page=p3-leads-manager&action=export_csv&scope=all') . '" style="background: #1e293b; color: #e2e8f0; font-weight: 700; padding: 12px 16px; border-radius: 10px; text-decoration: none; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid #334155;">📥 Exportar CSV</a>';
         echo '<a href="https://wa.me/5511983030672" target="_blank" style="background: #f59e0b; color: #020617; font-weight: 700; padding: 12px 18px; border-radius: 10px; text-decoration: none; font-size: 13px;">💬 WhatsApp Carlos Yoshimori</a>';
         echo '<a href="https://wa.me/5511980846341" target="_blank" style="background: #3b82f6; color: #ffffff; font-weight: 700; padding: 12px 18px; border-radius: 10px; text-decoration: none; font-size: 13px;">💬 WhatsApp William Lourenço</a>';
         echo '</div>';
@@ -1071,9 +1112,10 @@ if (!function_exists('p3_register_admin_menu')) {
         // Action Toolbar above Table
         echo '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding: 0 4px; flex-wrap: wrap; gap: 10px;">';
         echo '<div style="font-size: 14px; color: #334155; font-weight: 700;">Leads e Cadastros no Banco de Dados (' . $total . ')</div>';
-        echo '<div style="display: flex; gap: 8px; align-items: center;">';
-        echo '<a href="' . admin_url('admin.php?page=p3-leads-manager&action=export_xls') . '" style="background: #059669; color: #fff; font-weight: 700; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-size: 12px; display: inline-flex; align-items: center; gap: 6px;">📊 Baixar em XLS (Excel)</a>';
-        echo '<a href="' . admin_url('admin.php?page=p3-leads-manager&action=export_csv') . '" style="background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; font-weight: 600; padding: 8px 14px; border-radius: 8px; text-decoration: none; font-size: 12px;">Exportar CSV</a>';
+        echo '<div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">';
+        echo '<a href="' . admin_url('admin.php?page=p3-leads-manager&action=export_xls&scope=active') . '" style="background: #059669; color: #fff; font-weight: 700; padding: 8px 14px; border-radius: 8px; text-decoration: none; font-size: 12px; display: inline-flex; align-items: center; gap: 6px;">📊 Baixar Excel (Só Ativos)</a>';
+        echo '<a href="' . admin_url('admin.php?page=p3-leads-manager&action=export_xls&scope=all') . '" style="background: #065f46; color: #fff; font-weight: 700; padding: 8px 14px; border-radius: 8px; text-decoration: none; font-size: 12px; display: inline-flex; align-items: center; gap: 6px;">📁 Baixar Excel (Todos)</a>';
+        echo '<a href="' . admin_url('admin.php?page=p3-leads-manager&action=export_csv&scope=all') . '" style="background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; font-weight: 600; padding: 8px 14px; border-radius: 8px; text-decoration: none; font-size: 12px;">Exportar CSV</a>';
         echo '</div>';
         echo '</div>';
 
